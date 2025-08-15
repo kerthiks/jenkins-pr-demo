@@ -1,37 +1,41 @@
 pipeline {
     agent any
+
     environment {
-        GH_TOKEN = credentials('github-creds') // references Jenkins stored token
+        GH_TOKEN = credentials('github-token') // optional — only if you use gh CLI
     }
+
     stages {
         stage('Build') {
             steps {
-                echo "Building branch ${env.BRANCH_NAME}"
-                sh 'echo Building application...'
+                echo "🔧 Building branch: ${env.BRANCH_NAME}"
+                sh './run-tests.sh'
             }
         }
-        stage('Test') {
+
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
             steps {
-                echo "Running tests..."
-                sh 'echo All tests passed!'
+                echo '🚀 Deploying to production...'
+                sh './deploy.sh'
             }
         }
     }
+
     post {
         success {
             script {
-                if (env.CHANGE_ID) {
-                    echo "This is a PR. Attempting to merge PR #${env.CHANGE_ID}..."
-
-                    def repo = "kerthiks/jenkins-pr-demo" // change this
-
-                    sh """
-                    curl -X PUT -H "Authorization: token ${GH_TOKEN}" \
-                    -H "Accept: application/vnd.github+json" \
-                    https://api.github.com/repos/${repo}/pulls/${env.CHANGE_ID}/merge
-                    """
+                if (env.BRANCH_NAME == 'main') {
+                    echo "✅ Build on main succeeded — deployed."
+                } else if (env.CHANGE_ID) {
+                    echo "✅ PR build succeeded — no merge needed here."
                 }
             }
+        }
+        failure {
+            echo "❌ Build failed."
         }
     }
 }
